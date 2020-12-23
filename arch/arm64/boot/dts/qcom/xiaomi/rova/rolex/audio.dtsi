@@ -1,0 +1,22 @@
+&i2c_2 {
+	aw87319@58{ /*AW87319 PA*/
+		compatible = "awinic,aw87319_pa";
+		reg = <0x58>;
+		qcom,ext_pa_spk_aw87319_rst = <&tlmm 124 0>;
+	};
+};
+
+&int_codec {
+	qcom,audio-routing =
+		"RX_BIAS", "MCLK",
+		"SPK_RX_BIAS", "MCLK",
+		"INT_LDO_H", "MCLK",
+		"MIC BIAS External", "Handset Mic",
+		"MIC BIAS Internal2", "Headset Mic",
+		"MIC BIAS External", "Secondary Mic",
+		"AMIC1", "MIC BIAS External",
+		"AMIC2", "MIC BIAS Internal2",
+		"AMIC3", "MIC BIAS External",
+		"WSA_SPK OUT", "VDD_WSA_SWITCH",
+		"SpkrMono WSA_IN", "WSA_SPK OUT";
+};
