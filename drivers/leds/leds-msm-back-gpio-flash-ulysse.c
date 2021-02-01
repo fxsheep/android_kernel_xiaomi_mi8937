@@ -270,7 +270,7 @@ static int led_gpio_flash_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, flash_led);
-	flash_led->cdev.max_brightness = LED_FULL;
+	flash_led->cdev.max_brightness = 1;
 	flash_led->cdev.brightness_set = led_gpio_brightness_set;
 	flash_led->cdev.brightness_get = led_gpio_brightness_get;
 
