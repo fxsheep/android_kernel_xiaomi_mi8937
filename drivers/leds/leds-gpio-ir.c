@@ -642,7 +642,7 @@ static struct platform_driver gpio_led_driver = {
 	.probe		= gpio_led_probe,
 	.remove		= gpio_led_remove,
 	.driver		= {
-		.name	= "leds-gpio",
+		.name	= "leds-gpio-ir",
 		.owner	= THIS_MODULE,
 		.of_match_table = of_match_ptr(of_gpio_leds_match),
 	},
@@ -653,4 +653,4 @@ module_platform_driver(gpio_led_driver);
 MODULE_AUTHOR("Raphael Assenat <raph@8d.com>, Trent Piepho <tpiepho@freescale.com>");
 MODULE_DESCRIPTION("GPIO LED driver");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:leds-gpio");
+MODULE_ALIAS("platform:leds-gpio-ir");
