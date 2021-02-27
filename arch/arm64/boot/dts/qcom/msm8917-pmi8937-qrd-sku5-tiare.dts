@@ -19,8 +19,8 @@
 #include "msm8937-mdss-panels.dtsi"
 
 #include "xiaomi/xiaomi.dtsi"
-#include "xiaomi/rova/rova.dtsi"
-#include "xiaomi/rova/riva/riva.dtsi"
+#include "xiaomi/rova/rova-overlay.dtsi"
+#include "xiaomi/rova/riva/riva-overlay.dtsi"
 #include "xiaomi/rova/tiare/tiare.dtsi"
 
 / {

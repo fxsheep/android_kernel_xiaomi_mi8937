@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
  * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -11,18 +11,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-
-/ {
-	qrd_batterydata: qcom,battery-data {
-			qcom,batt-id-range-pct = <15>;
-			qcom,rpull-up-kohm = <68>;
-			qcom,vref-batt-therm = <1800000>;
-			#include "batterydata/batterydata-wingtech-desai_SAMSUNG-4v4-4000mah.dtsi"
-			#include "batterydata/batterydata-wingtech-feimaotui_SONY-4v4-4000mah.dtsi"
-			#include "batterydata/batterydata-wingtech-xingwangda_ATL-4v4-4000mah.dtsi"
-			#include "batterydata/batterydata-wingtech-guangyu_Coslight-4v4-4000mah.dtsi"
-	};
-};
 
 &i2c_5 {
 	status = "ok";
@@ -49,6 +37,7 @@
 
 		regulator-name = "bq2560x_otg_supply";
 		vdd-supply = <&pm8937_l17>;
+		dpdm-supply = <&usb_otg>;
 
 		ti,bq2560x,chip-enable-gpio = <48>;
 		ti,bq2560x,usb-vlim = <4400>;
@@ -87,4 +76,29 @@
 
 		ti,bq2560x,software-jeita-supported;
 	};
+};
+
+&usb_otg {
+	qcom,hsusb-otg-mode = <3>;
+	interrupts = <0 134 0>,<0 140 0>,<0 136 0>;
+	interrupt-names = "core_irq", "async_irq", "phy_irq";
+	vbus_otg-supply = <&bq2560x_otg_supply>;
+	qcom,hsusb-otg-phy-init-seq =
+		<0x53 0x80 0x39 0x81 0x37 0x82 0xffffffff>;
+
+	extcon = <&bq2560x_otg_supply>;
+};
+
+/ {
+	qrd_batterydata: qcom,battery-data {
+			qcom,batt-id-range-pct = <15>;
+			qcom,rpull-up-kohm = <68>;
+			qcom,vref-batt-therm = <1800000>;
+			#include "../../../batterydata-qrd-sku2-4v35-2590mah.dtsi"
+			#include "battery/batterydata-wingtech-desai_SAMSUNG-4v4-4000mah.dtsi"
+			#include "battery/batterydata-wingtech-feimaotui_SONY-4v4-4000mah.dtsi"
+			#include "battery/batterydata-wingtech-xingwangda_ATL-4v4-4000mah.dtsi"
+			#include "battery/batterydata-wingtech-guangyu_Coslight-4v4-4000mah.dtsi"
+	};
+
 };

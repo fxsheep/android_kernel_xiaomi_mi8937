@@ -11,27 +11,20 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-&tlmm {
-		smb_int_pin {
-			smb_int_default: smb_int_default {
-				pins = "gpio61";
-				drive-strength = <2>;	/*8 MA */
-				bias-pull-up;		/* PULL UP*/
-			};
-		};
 
-		gpio_led_pins {
-			gpio_led_off: gpio_led_off {
-				mux {
-					pins = "gpio45";
-					function = "gpio";
-				};
-				config {
-					pins = "gpio45";
-					drive-strength = <6>;
-					bias-pull-down;
-					output-low;
-				};
+&soc {
+	tlmm: pinctrl@1000000 {
+		bq_int_default: bq_int_default {
+			mux {
+				pins = "gpio25";
+				function ="gpio";
+			};
+			config {
+				pins = "gpio25";
+				drive-strength = <2>; /* 2 MA */
+				bias-pull-up;
+				/* PULL UP*/
 			};
 		};
+	};
 };

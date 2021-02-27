@@ -18,8 +18,8 @@
 #include "msm8917-audio.dtsi"
 
 #include "xiaomi/xiaomi.dtsi"
-#include "xiaomi/rova/rova.dtsi"
-#include "xiaomi/rova/rolex/rolex.dtsi"
+#include "xiaomi/rova/rova-overlay.dtsi"
+#include "xiaomi/rova/rolex/rolex-overlay.dtsi"
 
 / {
 	model = "Qualcomm Technologies, Inc. MSM8917-PMI8937 QRD SKU5";

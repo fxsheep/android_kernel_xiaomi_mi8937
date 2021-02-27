@@ -1,8 +1,0 @@
-#include "pinctrl.dtsi"
-
-#include "audio.dtsi"
-#include "display.dtsi"
-#include "misc.dtsi"
-#include "pm.dtsi"
-#include "sdhc.dtsi"
-#include "touchscreen.dtsi"
