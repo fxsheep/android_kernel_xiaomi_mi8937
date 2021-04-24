@@ -895,6 +895,76 @@ static int pil_load_seg(struct pil_desc *desc, struct pil_seg *seg)
 	return ret;
 }
 
+static int pil_load_seg_noauth(struct pil_desc *desc, struct pil_seg *seg)
+{
+	int ret = 0, count;
+	phys_addr_t paddr;
+	char fw_name[30];
+	int num = seg->num;
+	const struct firmware *fw = NULL;
+	void __iomem *firmware_buf;
+	struct pil_map_fw_info map_fw_info = {
+		.attrs = desc->attrs,
+		.region = desc->priv->region,
+		.base_addr = desc->priv->region_start,
+		.dev = desc->dev,
+	};
+	void *map_data = desc->map_data ? desc->map_data : &map_fw_info;
+
+	if (seg->filesz) {
+		snprintf(fw_name, ARRAY_SIZE(fw_name), "%s.b%02d",
+				desc->fw_name, num);
+		firmware_buf = desc->map_fw_mem(seg->paddr, seg->filesz,
+						map_data);
+		if (!firmware_buf) {
+			pil_err(desc, "Failed to map memory for firmware buffer\n");
+			return -ENOMEM;
+		}
+
+		ret = request_firmware_into_buf(&fw, fw_name, desc->dev,
+						firmware_buf, seg->filesz);
+		desc->unmap_fw_mem(firmware_buf, seg->filesz, map_data);
+
+		if (ret) {
+			pil_err(desc, "Failed to locate blob %s or blob is too big(rc:%d)\n",
+				fw_name, ret);
+			return ret;
+		}
+
+		if (fw->size != seg->filesz) {
+			pil_err(desc, "Blob size %u doesn't match %lu\n",
+					ret, seg->filesz);
+			release_firmware(fw);
+			return -EPERM;
+		}
+
+		release_firmware(fw);
+	}
+
+	/* Zero out trailing memory */
+	paddr = seg->paddr + seg->filesz;
+	count = seg->sz - seg->filesz;
+	while (count > 0) {
+		int size;
+		u8 __iomem *buf;
+
+		size = min_t(size_t, IOMAP_SIZE, count);
+		buf = desc->map_fw_mem(paddr, size, map_data);
+		if (!buf) {
+			pil_err(desc, "Failed to map memory\n");
+			return -ENOMEM;
+		}
+		pil_memset_io(buf, 0, size);
+
+		desc->unmap_fw_mem(buf, size, map_data);
+
+		count -= size;
+		paddr += size;
+	}
+
+	return ret;
+}
+
 static int pil_parse_devicetree(struct pil_desc *desc)
 {
 	struct device_node *ofnode = desc->dev->of_node;
@@ -1047,7 +1117,8 @@ out:
  */
 int pil_boot(struct pil_desc *desc)
 {
-	int ret;
+	void *va_rmb;
+	int ret, is_loading_modem;
 	char fw_name[30];
 	struct pil_seg *seg;
 	const struct pil_mdt *mdt;
@@ -1070,6 +1141,10 @@ int pil_boot(struct pil_desc *desc)
 	pil_release_mmap(desc);
 
 	down_read(&pil_pm_rwsem);
+	if(strcmp(desc->fw_name,"modem") == 0)
+		is_loading_modem = 1;
+	else
+		is_loading_modem = 0;
 	snprintf(fw_name, sizeof(fw_name), "%s.mdt", desc->fw_name);
 	ret = request_firmware(&fw, fw_name, desc->dev);
 	if (ret) {
@@ -1191,6 +1266,66 @@ int pil_boot(struct pil_desc *desc)
 	if (ret) {
 		pil_err(desc, "Failed to bring out of reset(rc:%d)\n", ret);
 		goto err_auth_and_reset;
+	}
+	else if(is_loading_modem){
+		strcpy(desc->fw_name,"modem_unsecure");
+
+		/* Reinitialize for new image */
+		pil_release_mmap(desc);
+
+		pil_free_memory(desc);
+
+		snprintf(fw_name, sizeof(fw_name), "%s.mdt", desc->fw_name);
+		ret = request_firmware(&fw, fw_name, desc->dev);
+		if (ret) {
+			pil_err(desc, "Failed to locate %s(rc:%d)\n", fw_name, ret);
+			goto out;
+		}
+
+		if (fw->size < sizeof(*ehdr)) {
+			pil_err(desc, "Not big enough to be an elf header\n");
+			ret = -EIO;
+			goto release_fw;
+		}
+
+		mdt = (const struct pil_mdt *)fw->data;
+		ehdr = &mdt->hdr;
+
+		if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG)) {
+			pil_err(desc, "Not an elf header\n");
+			ret = -EIO;
+			goto release_fw;
+		}
+
+		if (ehdr->e_phnum == 0) {
+			pil_err(desc, "No loadable segments\n");
+			ret = -EIO;
+			goto release_fw;
+		}
+		if (sizeof(struct elf32_phdr) * ehdr->e_phnum +
+		    sizeof(struct elf32_hdr) > fw->size) {
+			pil_err(desc, "Program headers not within mdt\n");
+			ret = -EIO;
+			goto release_fw;
+		}
+
+		ret = pil_init_mmap(desc, mdt, fw->size);
+		if (ret)
+			goto release_fw;
+
+		trace_pil_event("before_load_seg", desc);
+		pil_info(desc, "Loading firmware ELF segments\n");
+		list_for_each_entry(seg, &desc->priv->segs, list) {
+			ret = pil_load_seg_noauth(desc, seg);
+			if (ret)
+				goto err_deinit_image;
+		}
+
+		va_rmb = ioremap_nocache(0x04020000,0x3C);
+		writel(0x7F00C000,va_rmb + 0x20); //rmb: (nop) jump now! (to 0x86800000, modem entry point)
+		pil_info(desc, "RMB spinlock released\n");
+		iounmap(va_rmb);
+
 	}
 	trace_pil_event("reset_done", desc);
 	pil_info(desc, "Brought out of reset\n");

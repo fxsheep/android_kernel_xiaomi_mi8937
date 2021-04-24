@@ -984,12 +984,18 @@ static int pil_msa_mba_verify_blob(struct pil_desc *pil, phys_addr_t phy_addr,
 
 static int pil_msa_mba_auth(struct pil_desc *pil)
 {
+        void *va, *va_rmb;
 	struct modem_data *drv = dev_get_drvdata(pil->dev);
 	struct q6v5_data *q6_drv = container_of(pil, struct q6v5_data, desc);
-	int ret;
+	int ret, offset;
 	struct device *dma_dev = drv->mba_mem_dev_fixed ?: &drv->mba_mem_dev;
 	s32 status;
 	u64 val = is_timeout_disabled() ? 0 : modem_auth_timeout_ms * 1000;
+
+	//Map before MBA finishes to save time
+        va = ioremap_nocache(0x86800000,0xf000);
+        va_rmb = ioremap_nocache(0x04020000,0x3C);
+        offset = 0x078C;
 
 	/* Wait for all segments to be authenticated or an error to occur */
 	ret = readl_poll_timeout(drv->rmb_base + RMB_MBA_STATUS, status,
@@ -1001,6 +1007,38 @@ static int pil_msa_mba_auth(struct pil_desc *pil)
 		dev_err(pil->dev, "MBA returned error %d for image\n", status);
 		ret = -EINVAL;
 	}
+
+
+	writel(0x5800C000,va + offset + 0   ); //jump .
+	//Disable interrupts (ssr), reset syscfg, cool down the core
+	writel(0x7800C000,va + offset + 0x4 ); //r0 = #0
+	writel(0x67004006,va + offset + 0x8 ); //ssr = r0
+	writel(0x7800C500,va + offset + 0xC ); //r0 = #0x28
+	writel(0x6700C012,va + offset + 0x10); //syscfg = r0
+	writel(0xA200C000,va + offset + 0x14); //dckill
+	writel(0x56C0D000,va + offset + 0x18); //ickill
+	writel(0x57C0C002,va + offset + 0x1C); //isync
+	writel(0x722FC402,va + offset + 0x20); //r15.h = #0x402 //RMB spinlock addr
+	writel(0x712FC020,va + offset + 0x24); //r15.l = #0x20
+	writel(0x528FC000,va + offset + 0x28); //jumpr r15
+	//Disable MMU function
+	writel(0xF31FD91F,va + offset + 0x2C); //r31 = add (r31, r25) //r25 seems to store virt/phys diff
+	writel(0x6E92C00F,va + offset + 0x30); //r15 = syscfg
+	writel(0x8CCFC02F,va + offset + 0x34); //r15 = clrbit (r15, #0)
+	writel(0x670FC012,va + offset + 0x38); //syscfg = r15
+	writel(0x57C0C002,va + offset + 0x3C); //isync
+	writel(0x529FC000,va + offset + 0x40); //jumpr r31
+
+	writel(0x5800C000,va_rmb + 0x20);
+	writel(0x72AFC680,va_rmb + 0x24); //r15.h = #0x8680
+	writel(0x712FC000,va_rmb + 0x28); //r15.l = #0x0000
+	writel(0x528FC000,va_rmb + 0x2C); //jumpr r15
+
+	writel(0x5A00C016,va + offset + 0   ); 	//call .+0x2C //Disable MMU, get out of spin and start, which then spins @ rmb
+
+	iounmap(va);
+	iounmap(va_rmb);
+
 
 	if (drv->q6) {
 		if (drv->q6->mba_dp_virt && !drv->mba_mem_dev_fixed) {
