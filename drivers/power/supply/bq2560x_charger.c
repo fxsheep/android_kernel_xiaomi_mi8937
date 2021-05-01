@@ -2172,7 +2172,7 @@ static irqreturn_t bq2560x_charger_interrupt(int irq, void *dev_id)
 			bq->usb_present = false;
 			bq->usb_supply_type = POWER_SUPPLY_TYPE_UNKNOWN;
 			extcon_set_cable_state_(bq->extcon, EXTCON_USB, false);
-			/* bq2560x_request_dpdm(bq, false); */
+			bq2560x_request_dpdm(bq, false);
 		}
 
 		if (bq->software_jeita_supported) {
@@ -2222,6 +2222,9 @@ static void determine_initial_status(struct bq2560x *bq)
 	ret = bq2560x_get_hiz_mode(bq, &status);
 	if (!ret) 
 		bq->in_hiz = !!status;
+
+	// Dirty hack to let everything operational
+	bq->usb_present = true;
 
 	if (bq->usb_present)
 		bq2560x_request_dpdm(bq, true);
