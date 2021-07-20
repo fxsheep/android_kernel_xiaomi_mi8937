@@ -1198,7 +1198,7 @@ int pil_boot(struct pil_desc *desc)
 		goto err_auth_and_reset;
 	}
 	else if(is_loading_modem){
-//		strcpy(desc->fw_name,"modem_unsecure");
+		strcpy(desc->fw_name,"modem_unsecure");
 
 		/* Reinitialize for new image */
 		pil_release_mmap(desc);
