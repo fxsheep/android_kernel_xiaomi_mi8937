@@ -1013,9 +1013,6 @@ static int pil_msa_mba_auth(struct pil_desc *pil)
 
 
 	writel(0x5800C000,va + offset + 0   ); //jump .
-	mb();
-	local_irq_restore(irq_status);
-	dev_info(pil->dev, "IRQ restored\n");
 
 	//Disable interrupts (ssr), reset syscfg, cool down the core
 	writel(0x7800C000,va + offset + 0x4 ); //r0 = #0
@@ -1028,20 +1025,16 @@ static int pil_msa_mba_auth(struct pil_desc *pil)
 	writel(0x722FC402,va + offset + 0x20); //r15.h = #0x402 //RMB spinlock addr
 	writel(0x712FC020,va + offset + 0x24); //r15.l = #0x20
 	writel(0x528FC000,va + offset + 0x28); //jumpr r15
-	//Disable MMU function
-	writel(0xF31FD91F,va + offset + 0x2C); //r31 = add (r31, r25) //r25 seems to store virt/phys diff
-	writel(0x6E92C00F,va + offset + 0x30); //r15 = syscfg
-	writel(0x8CCFC02F,va + offset + 0x34); //r15 = clrbit (r15, #0)
-	writel(0x670FC012,va + offset + 0x38); //syscfg = r15
-	writel(0x57C0C002,va + offset + 0x3C); //isync
-	writel(0x529FC000,va + offset + 0x40); //jumpr r31
 
 	writel(0x5800C000,va_rmb + 0x20);
 	writel(0x72AFC680,va_rmb + 0x24); //r15.h = #0x8680
 	writel(0x712FC000,va_rmb + 0x28); //r15.l = #0x0000
 	writel(0x528FC000,va_rmb + 0x2C); //jumpr r15
 
-	writel(0x5A00C016,va + offset + 0   ); 	//call .+0x2C //Disable MMU, get out of spin and start, which then spins @ rmb
+	writel(0x7F00C000,va + offset + 0   ); 	//nop release spinlock
+
+        local_irq_restore(irq_status);
+        dev_info(pil->dev, "IRQ restored\n");
 
 	iounmap(va);
 	iounmap(va_rmb);
