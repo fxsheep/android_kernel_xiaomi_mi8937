@@ -989,14 +989,17 @@ static int pil_msa_mba_auth(struct pil_desc *pil)
 	struct q6v5_data *q6_drv = container_of(pil, struct q6v5_data, desc);
 	int ret, offset;
 	struct device *dma_dev = drv->mba_mem_dev_fixed ?: &drv->mba_mem_dev;
+	unsigned long irq_status;
 	s32 status;
 	u64 val = is_timeout_disabled() ? 0 : modem_auth_timeout_ms * 1000;
 
 	//Map before MBA finishes to save time
-        va = ioremap_nocache(0x86800000,0xf000);
+        va = ioremap_nocache(0x86800000,0x4800000);
         va_rmb = ioremap_nocache(0x04020000,0x3C);
-        offset = 0x078C;
+        offset = 0x0718;
 
+	local_irq_save(irq_status);
+	dev_info(pil->dev, "IRQ disabled\n");
 	/* Wait for all segments to be authenticated or an error to occur */
 	ret = readl_poll_timeout(drv->rmb_base + RMB_MBA_STATUS, status,
 		status == STATUS_AUTH_COMPLETE || status < 0, 50, val);
@@ -1010,6 +1013,10 @@ static int pil_msa_mba_auth(struct pil_desc *pil)
 
 
 	writel(0x5800C000,va + offset + 0   ); //jump .
+	mb();
+	local_irq_restore(irq_status);
+	dev_info(pil->dev, "IRQ restored\n");
+
 	//Disable interrupts (ssr), reset syscfg, cool down the core
 	writel(0x7800C000,va + offset + 0x4 ); //r0 = #0
 	writel(0x67004006,va + offset + 0x8 ); //ssr = r0
