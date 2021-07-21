@@ -1009,32 +1009,31 @@ static int pil_msa_mba_auth(struct pil_desc *pil)
 	} else if (status < 0) {
 		dev_err(pil->dev, "MBA returned error %d for image\n", status);
 		ret = -EINVAL;
+	} else {
+		writel(0x5800C000,va + offset + 0   ); //jump . spinlock
+
+		//Disable interrupts (ssr), reset syscfg, cool down the core
+		writel(0x7800C000,va + offset + 0x4 ); //r0 = #0
+		writel(0x67004006,va + offset + 0x8 ); //ssr = r0
+		writel(0x7800C500,va + offset + 0xC ); //r0 = #0x28
+		writel(0x6700C012,va + offset + 0x10); //syscfg = r0
+		writel(0xA200C000,va + offset + 0x14); //dckill
+		writel(0x56C0D000,va + offset + 0x18); //ickill
+		writel(0x57C0C002,va + offset + 0x1C); //isync
+		writel(0x722FC402,va + offset + 0x20); //r15.h = #0x402 //RMB spinlock addr
+		writel(0x712FC020,va + offset + 0x24); //r15.l = #0x20
+		writel(0x528FC000,va + offset + 0x28); //jumpr r15
+
+		writel(0x5800C000,va_rmb + 0x20); //jump . spinlock
+		writel(0x72AFC680,va_rmb + 0x24); //r15.h = #0x8680
+		writel(0x712FC000,va_rmb + 0x28); //r15.l = #0x0000
+		writel(0x528FC000,va_rmb + 0x2C); //jumpr r15
+
+		writel(0x7F00C000,va + offset + 0   ); 	//nop release spinlock
 	}
 
-
-	writel(0x5800C000,va + offset + 0   ); //jump .
-
-	//Disable interrupts (ssr), reset syscfg, cool down the core
-	writel(0x7800C000,va + offset + 0x4 ); //r0 = #0
-	writel(0x67004006,va + offset + 0x8 ); //ssr = r0
-	writel(0x7800C500,va + offset + 0xC ); //r0 = #0x28
-	writel(0x6700C012,va + offset + 0x10); //syscfg = r0
-	writel(0xA200C000,va + offset + 0x14); //dckill
-	writel(0x56C0D000,va + offset + 0x18); //ickill
-	writel(0x57C0C002,va + offset + 0x1C); //isync
-	writel(0x722FC402,va + offset + 0x20); //r15.h = #0x402 //RMB spinlock addr
-	writel(0x712FC020,va + offset + 0x24); //r15.l = #0x20
-	writel(0x528FC000,va + offset + 0x28); //jumpr r15
-
-	writel(0x5800C000,va_rmb + 0x20);
-	writel(0x72AFC680,va_rmb + 0x24); //r15.h = #0x8680
-	writel(0x712FC000,va_rmb + 0x28); //r15.l = #0x0000
-	writel(0x528FC000,va_rmb + 0x2C); //jumpr r15
-
-	writel(0x7F00C000,va + offset + 0   ); 	//nop release spinlock
-
-        local_irq_restore(irq_status);
-        dev_info(pil->dev, "IRQ restored\n");
+	local_irq_restore(irq_status);
+	dev_info(pil->dev, "IRQ restored\n");
 
 	iounmap(va);
 	iounmap(va_rmb);
